@@ -1,5 +1,7 @@
 package com.library.model;
 
+import java.time.LocalDate;
+
 public class Book {
 	// Attributes :
 	private String title, author;
@@ -8,10 +10,29 @@ public class Book {
 	
 	// Constructor :
 	public Book(String title, String author, int bookId, int publicationYear) {
-		this.title = title;
-		this.author = author;
-		this.bookId = bookId;
-		this.publicationYear = publicationYear;
+
+	    // Validate the book's descriptive information
+	    if (title == null || title.isBlank()) {
+	        throw new IllegalArgumentException("Book title cannot be empty");
+	    }
+
+	    if (author == null || author.isBlank()) {
+	        throw new IllegalArgumentException("Book author cannot be empty");
+	    }
+
+	    // Validate identification and publication year
+	    if (bookId <= 0) {
+	        throw new IllegalArgumentException("Invalid book ID");
+	    }
+
+	    if (publicationYear <= 0 || publicationYear > LocalDate.now().getYear()) {
+	        throw new IllegalArgumentException("Invalid publication year");
+	    }
+
+	    this.title = title;
+	    this.author = author;
+	    this.bookId = bookId;
+	    this.publicationYear = publicationYear;
 	}
 	
 	// Methods :

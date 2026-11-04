@@ -69,9 +69,24 @@ public class Borrow {
 		actualReturnDate = LocalDate.now();
 		status = BorrowStatus.RETURNED;
 	}
-    public void markAsOverdue() {
-        this.status = BorrowStatus.OVERDUE;
-    }
+	public void markAsOverdue() {
+
+	    // Only active borrowings can become overdue
+	    if (status != BorrowStatus.ACTIVE) {
+	        throw new IllegalStateException(
+	            "Only active borrowings can become overdue"
+	        );
+	    }
+
+	    // Verify that the expected return date has passed
+	    if (!LocalDate.now().isAfter(expectedReturnDate)) {
+	        throw new IllegalStateException(
+	            "Borrowing is not overdue yet"
+	        );
+	    }
+
+	    status = BorrowStatus.OVERDUE;
+	}
     
 	
 	@Override

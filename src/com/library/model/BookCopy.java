@@ -8,10 +8,21 @@ public class BookCopy {
 	private CopyStatus status;
 	
 	//Constructor : 
-	public BookCopy(int copyId , Book book , CopyStatus status) {
-		this.copyId = copyId;
-		this.book = book;
-		this.status = status;
+	public BookCopy(int copyId, Book book, CopyStatus status) {
+
+	    // A physical copy must belong to a book
+	    if (book == null) {
+	        throw new IllegalArgumentException("Book cannot be null");
+	    }
+
+	    // Every copy must have an initial status
+	    if (status == null) {
+	        throw new IllegalArgumentException("Copy status cannot be null");
+	    }
+
+	    this.copyId = copyId;
+	    this.book = book;
+	    this.status = status;
 	}
 	
 	//getter :

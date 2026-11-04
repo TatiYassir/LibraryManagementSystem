@@ -8,6 +8,18 @@ public class Member {
 	
 	// Constructor :
 	public Member(String fullName,String email,String phoneNumber, int memberId) {
+		// Validate member information
+		if (fullName == null || fullName.isBlank()) {
+		    throw new IllegalArgumentException("Member name cannot be empty");
+		}
+
+		if (phoneNumber == null || phoneNumber.isBlank()) {
+		    throw new IllegalArgumentException("Phone number cannot be empty");
+		}
+
+		if (memberId <= 0) {
+		    throw new IllegalArgumentException("Invalid member ID");
+		}
 		this.fullName = fullName;
 		if (!isValidEmail(email)) {
 	        throw new IllegalArgumentException("Invalid email address");

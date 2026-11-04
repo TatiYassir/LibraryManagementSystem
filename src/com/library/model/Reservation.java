@@ -81,7 +81,12 @@ public class Reservation {
         if (copy == null) {
             throw new IllegalArgumentException("Assigned book cannot be null");
         }
-
+        // Ensure the physical copy belongs to the reserved book
+        if (copy.getBook().getBookId() != book.getBookId()) {
+            throw new IllegalArgumentException(
+                "Copy does not belong to this book"
+            );
+        }
         // Ensure the reservation is waiting and the copy is available
         if (assignedCopy != null ||
                 status != ReservationStatus.WAITING ||
@@ -127,18 +132,25 @@ public class Reservation {
      * The reservation record is preserved for historical purposes.
      */
     public void cancel() {
-        // Only WAITING and READY_FOR_PICKUP reservations can be cancelled
-        if (status != ReservationStatus.WAITING &&
-                status != ReservationStatus.READY_FOR_PICKUP) {
-            throw new IllegalStateException("Reservation cannot be cancelled");
-        }
+    	// Only WAITING and READY_FOR_PICKUP reservations can be cancelled
+    	if (status != ReservationStatus.WAITING &&
+    	        status != ReservationStatus.READY_FOR_PICKUP) {
+    	    throw new IllegalStateException("Reservation cannot be cancelled");
+    	}
+    	// Verify that the assigned copy is still reserved
+    	if (assignedCopy != null &&
+    	        assignedCopy.getStatus() != CopyStatus.RESERVED) {
+    	    throw new IllegalStateException(
+    	        "Assigned copy is not reserved"
+    	    );
+    	}
 
-        // Release the assigned copy if one exists
-        if (assignedCopy != null) {
-            assignedCopy.setStatus(CopyStatus.AVAILABLE);
-        }
+    	// Release the assigned copy if one exists
+    	if (assignedCopy != null) {
+    	    assignedCopy.setStatus(CopyStatus.AVAILABLE);
+    	}
 
-        status = ReservationStatus.CANCELLED;
+    	status = ReservationStatus.CANCELLED;
     }
 
     /**
