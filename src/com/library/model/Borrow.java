@@ -69,6 +69,10 @@ public class Borrow {
 		actualReturnDate = LocalDate.now();
 		status = BorrowStatus.RETURNED;
 	}
+    public void markAsOverdue() {
+        this.status = BorrowStatus.OVERDUE;
+    }
+    
 	
 	@Override
 	public String toString() {
