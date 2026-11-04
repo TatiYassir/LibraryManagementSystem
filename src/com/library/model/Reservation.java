@@ -1,142 +1,183 @@
 package com.library.model;
 
-import java.util.ArrayList;
 import java.time.LocalDate;
+
 import com.library.enums.ReservationStatus;
 import com.library.enums.CopyStatus;
 
 public class Reservation {
-	//Attributes :
-	private final int reservationId;
-	private final Member member;
-	private final Book book;
-	private final LocalDate reservationDate;
-	private ReservationStatus status;
-	private LocalDate expirationDate;
-	private BookCopy assignedCopy;
-	// Constructor :
-	public Reservation(int reservationId, Member member, Book book) {
-		if (member == null || book == null) {
-		    throw new IllegalArgumentException("Member and book cannot be null");
-		}
-		this.reservationId = reservationId;
-		this.member = member;
-		this.book = book;
-		this.reservationDate = LocalDate.now();
-		this.status = ReservationStatus.WAITING;
-	}
-	
-	// getter :
-	
-	public int getReservationId() {
-		return reservationId;
-	}
-	public Member getMember() {
-		return member;
-	}
-	public LocalDate getReservationDate() {
-		return reservationDate;
-	}
-	public Book getBook() {
-		return book;
-	}
-	public BookCopy getAssignedCopy() {
-	    return assignedCopy;
-	}
-	public ReservationStatus getStatus() {
-	    return status;
-	}
-	public LocalDate getExpirationDate() {
-		return expirationDate;
-	}
-	
-	// Methods :
-	public void assignCopy(BookCopy copy) {
 
-	    // 1. Check that the copy is not null
-		if (copy == null) {
-			throw new IllegalArgumentException("assigned book cannot be null"); 
-		}
-	    // 2. Check that this reservation doesn't already have a copy
-		if (assignedCopy != null ||
-		        status != ReservationStatus.WAITING ||
-		        copy.getStatus() != CopyStatus.AVAILABLE) {
+    // Attributes
+    private final int reservationId;
+    private final Member member;
+    private final Book book;
+    private final LocalDate reservationDate;
+    private ReservationStatus status;
+    private LocalDate expirationDate;
+    private BookCopy assignedCopy;
 
-		    throw new IllegalStateException("Cannot assign this copy");
-		}
-		assignedCopy = copy;
-		copy.setStatus(CopyStatus.RESERVED);
-		status = ReservationStatus.READY_FOR_PICKUP;
-		
-		expirationDate = LocalDate.now().plusDays(3);
-	}
-	
-	public void fulfill() {
+    // Constructor
+    /**
+     * Creates a new reservation for a member and a book.
+     * A new reservation starts with WAITING status.
+     *
+     * @param reservationId unique identifier of the reservation
+     * @param member the member making the reservation
+     * @param book the book being reserved
+     */
+    public Reservation(int reservationId, Member member, Book book) {
+        if (member == null || book == null) {
+            throw new IllegalArgumentException("Member and book cannot be null");
+        }
 
-	    // 1. Validate reservation and assigned copy
-	    if (assignedCopy == null ||
-	            status != ReservationStatus.READY_FOR_PICKUP ||
-	            assignedCopy.getStatus() != CopyStatus.RESERVED) {
+        this.reservationId = reservationId;
+        this.member = member;
+        this.book = book;
+        this.reservationDate = LocalDate.now();
+        this.status = ReservationStatus.WAITING;
+    }
 
-	        throw new IllegalStateException("Reservation cannot be fulfilled");
-	    }
+    // Getters
+    public int getReservationId() {
+        return reservationId;
+    }
 
-	    // 2. Check whether the reservation has expired
-	    if (LocalDate.now().isAfter(expirationDate)) {
-	        throw new IllegalStateException("Reservation has expired");
-	    }
+    public Member getMember() {
+        return member;
+    }
 
-	    // 3. Mark reservation as fulfilled
-	    status = ReservationStatus.FULFILLED;
+    public LocalDate getReservationDate() {
+        return reservationDate;
+    }
 
-	    // 4. Update the physical copy status
-	    assignedCopy.setStatus(CopyStatus.BORROWED);
-	}
-	
-	public void cancel() {
-		if (status != ReservationStatus.WAITING &&
-		        status != ReservationStatus.READY_FOR_PICKUP) {
+    public Book getBook() {
+        return book;
+    }
 
-		    throw new IllegalStateException("Reservation cannot be cancelled");
-		}
-		if (assignedCopy != null) {
-			assignedCopy.setStatus(CopyStatus.AVAILABLE);
-		}
-		status = ReservationStatus.CANCELLED;
-	}
-	
-	public void expire() {
+    public BookCopy getAssignedCopy() {
+        return assignedCopy;
+    }
 
-	    // 1. Check reservation status
-		if (assignedCopy == null ||
-		        status != ReservationStatus.READY_FOR_PICKUP ||
-		        assignedCopy.getStatus() != CopyStatus.RESERVED) {
-		    throw new IllegalStateException("Reservation cannot expire");
-		}
+    public ReservationStatus getStatus() {
+        return status;
+    }
 
-	    // 2. Check expiration date
-	    if (!LocalDate.now().isAfter(expirationDate)) {
-	        throw new IllegalStateException("Reservation has not expired yet");
-	    }
+    public LocalDate getExpirationDate() {
+        return expirationDate;
+    }
 
-	    // 3. Update reservation status
-	    status = ReservationStatus.EXPIRED;
+    // Methods
 
-	    // 4. Update assigned copy status
-	    assignedCopy.setStatus(CopyStatus.AVAILABLE);
-	}
+    /**
+     * Assigns an available physical copy to this reservation.
+     * Changes the copy status to RESERVED and the reservation
+     * status to READY_FOR_PICKUP.
+     * The member has three days to collect the book.
+     *
+     * @param copy the available physical copy assigned to the reservation
+     */
+    public void assignCopy(BookCopy copy) {
+        // Check that the copy is not null
+        if (copy == null) {
+            throw new IllegalArgumentException("Assigned book cannot be null");
+        }
+
+        // Ensure the reservation is waiting and the copy is available
+        if (assignedCopy != null ||
+                status != ReservationStatus.WAITING ||
+                copy.getStatus() != CopyStatus.AVAILABLE) {
+            throw new IllegalStateException("Cannot assign this copy");
+        }
+
+        assignedCopy = copy;
+        copy.setStatus(CopyStatus.RESERVED);
+        status = ReservationStatus.READY_FOR_PICKUP;
+        expirationDate = LocalDate.now().plusDays(3);
+    }
+
+    /**
+     * Confirms that the member has collected the reserved book.
+     * Changes the reservation status to FULFILLED and the
+     * assigned copy status to BORROWED.
+     * The reservation must still be valid when collected.
+     */
+    public void fulfill() {
+        // Validate reservation and assigned copy
+        if (assignedCopy == null ||
+                status != ReservationStatus.READY_FOR_PICKUP ||
+                assignedCopy.getStatus() != CopyStatus.RESERVED) {
+            throw new IllegalStateException("Reservation cannot be fulfilled");
+        }
+
+        // Check whether the reservation has expired
+        if (LocalDate.now().isAfter(expirationDate)) {
+            throw new IllegalStateException("Reservation has expired");
+        }
+
+        // Mark reservation as fulfilled
+        status = ReservationStatus.FULFILLED;
+
+        // Update the physical copy status
+        assignedCopy.setStatus(CopyStatus.BORROWED);
+    }
+
+    /**
+     * Cancels a reservation that is either waiting or ready for pickup.
+     * If a copy has already been assigned, it becomes available again.
+     * The reservation record is preserved for historical purposes.
+     */
+    public void cancel() {
+        // Only WAITING and READY_FOR_PICKUP reservations can be cancelled
+        if (status != ReservationStatus.WAITING &&
+                status != ReservationStatus.READY_FOR_PICKUP) {
+            throw new IllegalStateException("Reservation cannot be cancelled");
+        }
+
+        // Release the assigned copy if one exists
+        if (assignedCopy != null) {
+            assignedCopy.setStatus(CopyStatus.AVAILABLE);
+        }
+
+        status = ReservationStatus.CANCELLED;
+    }
+
+    /**
+     * Marks a reservation as expired when the member fails to
+     * collect the book before the expiration date.
+     * The assigned copy becomes available again.
+     */
+    public void expire() {
+        // Validate reservation and assigned copy
+        if (assignedCopy == null ||
+                status != ReservationStatus.READY_FOR_PICKUP ||
+                assignedCopy.getStatus() != CopyStatus.RESERVED) {
+            throw new IllegalStateException("Reservation cannot expire");
+        }
+
+        // The reservation expires only after its expiration date
+        if (!LocalDate.now().isAfter(expirationDate)) {
+            throw new IllegalStateException("Reservation has not expired yet");
+        }
+
+        // Update reservation status
+        status = ReservationStatus.EXPIRED;
+
+        // Release the physical copy
+        assignedCopy.setStatus(CopyStatus.AVAILABLE);
+    }
+    
+    @Override
+    public String toString() {
+        return "Reservation ID: " + reservationId +
+               "\nMember: " + member.getFullName() +
+               "\nBook title: " + book.getTitle() +
+               "\nReservation date: " + reservationDate +
+               "\nExpiration date: " + expirationDate +
+               "\nReservation status: " + status +
+               "\nAssigned copy ID: " +
+               (assignedCopy == null ? "Not assigned yet" : assignedCopy.getCopyId());
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

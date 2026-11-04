@@ -9,6 +9,8 @@ import com.library.model.BookCopy;
 import com.library.model.Borrow;
 import com.library.enums.CopyStatus;
 import com.library.service.BorrowService;
+import com.library.model.Reservation;
+import com.library.service.ReservationService;
 
 public class Main {
 	public static void main (String [] args) {
@@ -19,7 +21,7 @@ public class Main {
 		BookCopy bc2 = new BookCopy(124, b1, CopyStatus.AVAILABLE);
 		BookCopy bc3 = new BookCopy(125, b1, CopyStatus.AVAILABLE);
 		BorrowService service = new BorrowService();
-		
+		ReservationService reservationService = new ReservationService();
 		
 		Borrow bw = service.borrowBook(
 			    m1, bc, LocalDate.now().plusDays(14)
@@ -34,16 +36,19 @@ public class Main {
 			    m2, bc3, LocalDate.now().plusDays(14)
 			);
 		
-		ArrayList<Borrow> history =
-			    service.findBorrowingsByMember(75);
+		Reservation r1 = reservationService.reserve(m1, b1);
+		Reservation r2 = reservationService.reserve(m2, b1);
+		// Display all reservations
+		reservationService.displayAllReservations();
 
-			System.out.println("Member history:");
-			for (Borrow borrow : history) {
-			    System.out.println(borrow);
-			}
-			service.displayBorrowingsByMember(75);
-			service.displayBorrowingsByMember(999);
-			System.out.println("Total records: " + history.size());
-			System.out.println("Total records in service: " + service.getTotalBorrowings());
+		// Find reservation by ID
+		System.out.println(reservationService.findReservationById(1));
+
+		// Display member's reservation history
+		reservationService.displayReservationsByMember(m1.getMemberId());
+
+		// Display total reservations
+		System.out.println("Total reservations: "
+		        + reservationService.getTotalReservations());
 	}	
 }
