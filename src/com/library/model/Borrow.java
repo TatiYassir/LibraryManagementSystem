@@ -69,6 +69,18 @@ public class Borrow {
 		actualReturnDate = LocalDate.now();
 		status = BorrowStatus.RETURNED;
 	}
+	
+	@Override
+	public String toString() {
+	    return "Borrow ID: " + borrowId +
+	           "\nMember: " + member.getFullName() +
+	           "\nBook: " + bookCopy.getBook().getTitle() +
+	           "\nCopy ID: " + bookCopy.getCopyId() +
+	           "\nBorrow Date: " + borrowDate +
+	           "\nExpected Return Date: " + expectedReturnDate +
+	           "\nActual Return Date: " + actualReturnDate +
+	           "\nStatus: " + status;
+	}
 }
 
 
