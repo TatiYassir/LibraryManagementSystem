@@ -76,7 +76,54 @@ public class MemberRepository {
             }
         }
     }
- // Update an existing member's information
+ // Search members by name, email, or phone number
+    public ArrayList<Member> searchMembers(String keyword)
+            throws SQLException {
+
+        if (keyword == null || keyword.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Search keyword cannot be empty");
+        }
+
+        String sql = """
+                SELECT member_id, full_name, email, phone_number
+                FROM members
+                WHERE LOWER(full_name) LIKE LOWER(?)
+                   OR LOWER(email) LIKE LOWER(?)
+                   OR phone_number LIKE ?
+                ORDER BY full_name
+                """;
+
+        ArrayList<Member> members = new ArrayList<>();
+
+        String searchPattern = "%" + keyword.trim() + "%";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, searchPattern);
+            statement.setString(2, searchPattern);
+            statement.setString(3, searchPattern);
+
+            try (ResultSet result = statement.executeQuery()) {
+
+                while (result.next()) {
+
+                    Member member = new Member(
+                            result.getString("full_name"),
+                            result.getString("email"),
+                            result.getString("phone_number"),
+                            result.getInt("member_id")
+                    );
+
+                    members.add(member);
+                }
+            }
+        }
+
+        return members;
+    }
+    // Update an existing member's information
     public void updateMember(Member member) throws SQLException {
 
         if (member == null) {

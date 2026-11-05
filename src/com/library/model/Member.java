@@ -45,9 +45,15 @@ public class Member {
 	
 	//setter :
 	public void setFullName(String fullName) {
+		if (fullName == null || fullName.isBlank()) {
+			throw new IllegalArgumentException("Member name cannot be empty");
+		}
 		this.fullName = fullName;
 	}
 	public void setPhoneNumber(String phoneNumber) {
+		if (phoneNumber == null || phoneNumber.isBlank()) {
+			throw new IllegalArgumentException("Phone number cannot be empty");
+		}
 		this.phoneNumber = phoneNumber;
 	}
 	public void setEmail(String email) {
@@ -64,6 +70,13 @@ public class Member {
 	    }
 
 	    return email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+	}
+	@Override
+	public String toString() {
+		return "Member ID: " + memberId +
+		       "\nName: " + fullName +
+		       "\nE-mail: " + email +
+		       "\nPhone: " + phoneNumber;
 	}
 	public void displayInfo() {
 		

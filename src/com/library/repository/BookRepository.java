@@ -99,7 +99,53 @@ public class BookRepository {
             }
         }
     }
- // Update an existing book's information
+ 
+ // Search books by title or author
+    public ArrayList<Book> searchBooks(String keyword)
+            throws SQLException {
+
+        if (keyword == null || keyword.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Search keyword cannot be empty");
+        }
+
+        String sql = """
+                SELECT book_id, title, author, publication_year
+                FROM books
+                WHERE LOWER(title) LIKE LOWER(?)
+                   OR LOWER(author) LIKE LOWER(?)
+                ORDER BY title
+                """;
+
+        ArrayList<Book> books = new ArrayList<>();
+
+        String searchPattern = "%" + keyword.trim() + "%";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, searchPattern);
+            statement.setString(2, searchPattern);
+
+            try (ResultSet result = statement.executeQuery()) {
+
+                while (result.next()) {
+
+                    Book book = new Book(
+                            result.getString("title"),
+                            result.getString("author"),
+                            result.getInt("book_id"),
+                            result.getInt("publication_year")
+                    );
+
+                    books.add(book);
+                }
+            }
+        }
+
+        return books;
+    }
+    // Update an existing book's information
     public void updateBook(Book book) throws SQLException {
 
         if (book == null) {

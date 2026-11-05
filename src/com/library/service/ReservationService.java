@@ -11,6 +11,7 @@ import com.library.enums.ReservationStatus;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import com.library.repository.ReservationRepository;
+import com.library.repository.BookCopyRepository;
 
 public class ReservationService {
 
@@ -21,6 +22,10 @@ public class ReservationService {
 	// Handles reservation database operations
 	private final ReservationRepository reservationRepository =
 	        new ReservationRepository();
+
+	// Used to find a free copy when a reservation is created
+	private final BookCopyRepository bookCopyRepository =
+	        new BookCopyRepository();
 
     // Methods
 
@@ -41,6 +46,20 @@ public class ReservationService {
 	                "Member and book cannot be null");
 	    }
 
+	    // A member cannot hold two open reservations for the same book
+	    for (Reservation existing :
+	            findReservationsByMember(member.getMemberId())) {
+
+	        boolean open =
+	                existing.getStatus() == ReservationStatus.WAITING
+	                || existing.getStatus() == ReservationStatus.READY_FOR_PICKUP;
+
+	        if (open && existing.getBook().getBookId() == book.getBookId()) {
+	            throw new IllegalStateException(
+	                    "This member already has an open reservation for this book");
+	        }
+	    }
+
 	    // Get the reservation date
 	    LocalDate reservationDate = LocalDate.now();
 
@@ -59,7 +78,53 @@ public class ReservationService {
 	    // Store the reservation in memory
 	    reservations.add(reservation);
 
+	    // If copies are free right now, hand them to the waiting queue
+	    // (first come, first served) instead of leaving them idle
+	    for (BookCopy copy :
+	            bookCopyRepository.findCopiesByBookId(book.getBookId())) {
+
+	        if (copy.getStatus() == CopyStatus.AVAILABLE
+	                && !assignNextReservation(book, copy)) {
+	            break;
+	        }
+	    }
+
 	    return reservation;
+	}
+
+	/**
+	 * Expires every READY_FOR_PICKUP reservation whose pickup deadline
+	 * has passed, releasing (or reassigning) the held copies.
+	 *
+	 * @return the number of reservations that were expired
+	 */
+	public int expireOverdueReservations() throws SQLException {
+
+	    int expiredCount = 0;
+
+	    for (Reservation databaseReservation :
+	            reservationRepository.findAllReservations()) {
+
+	        if (databaseReservation.getStatus()
+	                != ReservationStatus.READY_FOR_PICKUP) {
+	            continue;
+	        }
+
+	        LocalDate deadline = databaseReservation.getExpirationDate();
+
+	        if (deadline == null || !LocalDate.now().isAfter(deadline)) {
+	            continue;
+	        }
+
+	        // Use the service's own (cached) object so memory stays in sync
+	        Reservation tracked =
+	                findReservationById(databaseReservation.getReservationId());
+
+	        expireReservation(tracked);
+	        expiredCount++;
+	    }
+
+	    return expiredCount;
 	}
 
 	/**

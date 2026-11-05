@@ -133,6 +133,62 @@ public class BookCopyRepository {
 
         return copies;
     }
+ // Search physical copies by book title or author
+    public ArrayList<BookCopy> searchBookCopies(String keyword)
+            throws SQLException {
+
+        if (keyword == null || keyword.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Search keyword cannot be empty");
+        }
+
+        String sql = """
+                SELECT bc.copy_id, bc.status,
+                       b.book_id, b.title, b.author, b.publication_year
+                FROM book_copies bc
+                JOIN books b ON bc.book_id = b.book_id
+                WHERE LOWER(b.title) LIKE LOWER(?)
+                   OR LOWER(b.author) LIKE LOWER(?)
+                ORDER BY b.title, bc.copy_id
+                """;
+
+        ArrayList<BookCopy> copies = new ArrayList<>();
+
+        String searchPattern = "%" + keyword.trim() + "%";
+
+        try (Connection connection = DatabaseConnection.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, searchPattern);
+            statement.setString(2, searchPattern);
+
+            try (ResultSet result = statement.executeQuery()) {
+
+                while (result.next()) {
+
+                    Book book = new Book(
+                            result.getString("title"),
+                            result.getString("author"),
+                            result.getInt("book_id"),
+                            result.getInt("publication_year")
+                    );
+
+                    CopyStatus status =
+                            CopyStatus.valueOf(result.getString("status"));
+
+                    BookCopy copy = new BookCopy(
+                            result.getInt("copy_id"),
+                            book,
+                            status
+                    );
+
+                    copies.add(copy);
+                }
+            }
+        }
+
+        return copies;
+    }
     public ArrayList<BookCopy> findCopiesByBookId(int bookId)
             throws SQLException {
 

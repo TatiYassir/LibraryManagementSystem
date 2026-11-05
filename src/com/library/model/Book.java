@@ -58,12 +58,29 @@ public class Book {
 	
 	//setter
 	public void setTitle(String title) {
+		if (title == null || title.isBlank()) {
+			throw new IllegalArgumentException("Book title cannot be empty");
+		}
 		this.title = title;
 	}
 	public void setAuthor(String author) {
+		if (author == null || author.isBlank()) {
+			throw new IllegalArgumentException("Book author cannot be empty");
+		}
 		this.author = author;
 	}
 	public void setPublicationYear(int publicationYear) {
+		if (publicationYear <= 0 || publicationYear > LocalDate.now().getYear()) {
+			throw new IllegalArgumentException("Invalid publication year");
+		}
 		this.publicationYear = publicationYear;
+	}
+
+	@Override
+	public String toString() {
+		return "Book ID: " + bookId +
+		       "\nTitle: " + title +
+		       "\nAuthor: " + author +
+		       "\nPublication Year: " + publicationYear;
 	}
 }

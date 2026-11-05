@@ -20,7 +20,6 @@ public class BorrowService {
 	// Handles borrowing database operations
 	private final BorrowRepository borrowRepository =
 	        new BorrowRepository();
-    private int nextBorrowId = 1;
     private final ReservationService reservationService;
     private final ArrayList<Borrow> borrows = new ArrayList<>();
     
@@ -71,8 +70,9 @@ public class BorrowService {
         }
 
         // Create a temporary Borrow object for repository insertion
+        // (ID 0 is a placeholder: MariaDB generates the real ID)
         Borrow draft = new Borrow(
-                nextBorrowId,
+                0,
                 member,
                 copy,
                 expectedReturnDate
@@ -97,9 +97,6 @@ public class BorrowService {
 
         // Store the borrowing in memory
         borrows.add(borrow);
-
-        // Keep the temporary ID counter ahead
-        nextBorrowId = Math.max(nextBorrowId + 1, borrowId + 1);
 
         return borrow;
     }
@@ -215,8 +212,15 @@ public class BorrowService {
 
         for (Borrow databaseBorrow : databaseResults) {
 
-            Borrow cachedBorrow =
-                    findBorrowById(databaseBorrow.getBorrowId());
+            // Look in memory only: the row is already loaded from MariaDB
+            Borrow cachedBorrow = null;
+
+            for (Borrow current : borrows) {
+                if (current.getBorrowId() == databaseBorrow.getBorrowId()) {
+                    cachedBorrow = current;
+                    break;
+                }
+            }
 
             if (cachedBorrow != null) {
                 result.add(cachedBorrow);
@@ -228,6 +232,41 @@ public class BorrowService {
 
         return result;
     }
+    /**
+     * Updates overdue statuses, then returns every overdue borrowing.
+     */
+    public ArrayList<Borrow> findOverdueBorrowings() throws SQLException {
+
+        checkOverdueBorrowings();
+
+        ArrayList<Borrow> result = new ArrayList<>();
+
+        for (Borrow databaseBorrow : borrowRepository.findAllBorrowings()) {
+            if (databaseBorrow.getStatus() == BorrowStatus.OVERDUE) {
+                result.add(databaseBorrow);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Checks whether a member currently holds (active or overdue)
+     * a copy of the given book.
+     */
+    public boolean hasOutstandingBorrowOfBook(int memberId, int bookId)
+            throws SQLException {
+
+        for (Borrow borrow : findBorrowingsByMember(memberId)) {
+            if (borrow.getStatus() != BorrowStatus.RETURNED
+                    && borrow.getBookCopy().getBook().getBookId() == bookId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Returns the total number of borrowing records.
      *
@@ -343,9 +382,6 @@ public class BorrowService {
 
         // Store the borrowing record in memory
         borrows.add(borrow);
-
-        // Keep the local counter ahead of the database-generated ID
-        nextBorrowId = Math.max(nextBorrowId, borrowId + 1);
 
         return borrow;
     }

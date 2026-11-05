@@ -40,4 +40,11 @@ public class BookCopy {
 	public void setStatus(CopyStatus status) {
 		this.status = status;
 	}
+
+	@Override
+	public String toString() {
+		return "Copy ID: " + copyId +
+		       "\nBook: " + book.getTitle() +
+		       "\nStatus: " + status;
+	}
 }
