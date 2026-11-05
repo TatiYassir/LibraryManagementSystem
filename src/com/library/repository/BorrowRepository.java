@@ -8,7 +8,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Date;
 import java.time.LocalDate;
-
+import java.util.ArrayList;
 import com.library.model.Borrow;
 import com.library.model.Member;
 import com.library.model.Book;
@@ -16,6 +16,7 @@ import com.library.model.BookCopy;
 
 import com.library.enums.CopyStatus;
 import com.library.enums.BorrowStatus;
+import com.library.enums.ReservationStatus;
 
 public class BorrowRepository {
 
@@ -86,7 +87,7 @@ public class BorrowRepository {
 
 	                int rowsUpdated = statement.executeUpdate();
 
-	                if (rowsUpdated == 0) {
+	                if (rowsUpdated != 1) {
 	                    throw new SQLException(
 	                            "Book copy does not exist or is not available");
 	                }
@@ -306,4 +307,428 @@ public class BorrowRepository {
             }
         }
     }
+ // Collect a reservation and create a borrowing record
+ // All database changes happen in one transaction
+ public int collectReservation(
+         int reservationId,
+         Member member,
+         BookCopy copy,
+         LocalDate expectedReturnDate) throws SQLException {
+
+     if (member == null || copy == null || expectedReturnDate == null) {
+         throw new IllegalArgumentException(
+                 "Member, copy and expected return date cannot be null");
+     }
+
+     LocalDate borrowDate = LocalDate.now();
+
+     if (!expectedReturnDate.isAfter(borrowDate)) {
+         throw new IllegalArgumentException(
+                 "Expected return date must be after borrow date");
+     }
+
+     // Retrieve and lock the reservation
+     String findSql = """
+             SELECT member_id, assigned_copy_id, status, expiration_date
+             FROM reservations
+             WHERE reservation_id = ?
+             FOR UPDATE
+             """;
+
+     // Change the physical copy to BORROWED
+     String updateCopySql = """
+             UPDATE book_copies
+             SET status = ?
+             WHERE copy_id = ?
+             AND status = ?
+             """;
+
+     // Create the borrowing record
+     String insertBorrowSql = """
+             INSERT INTO borrows (
+                 member_id,
+                 copy_id,
+                 borrow_date,
+                 expected_return_date,
+                 status
+             )
+             VALUES (?, ?, ?, ?, ?)
+             """;
+
+     // Mark the reservation as FULFILLED
+     String updateReservationSql = """
+             UPDATE reservations
+             SET status = ?
+             WHERE reservation_id = ?
+             AND status = ?
+             AND assigned_copy_id = ?
+             AND expiration_date >= ?
+             """;
+
+     try (Connection connection = DatabaseConnection.getConnection()) {
+
+         connection.setAutoCommit(false);
+
+         try {
+
+             // 1. Verify the reservation
+             try (PreparedStatement statement =
+                     connection.prepareStatement(findSql)) {
+
+                 statement.setInt(1, reservationId);
+
+                 try (ResultSet result = statement.executeQuery()) {
+
+                     if (!result.next()) {
+                         throw new SQLException("Reservation not found");
+                     }
+
+                     int storedMemberId = result.getInt("member_id");
+
+                     int storedCopyId = result.getInt("assigned_copy_id");
+                     boolean copyAssigned = !result.wasNull();
+
+                     ReservationStatus status =
+                             ReservationStatus.valueOf(
+                                     result.getString("status"));
+
+                     java.sql.Date expirationSqlDate =
+                             result.getDate("expiration_date");
+
+                     if (!copyAssigned ||
+                             storedMemberId != member.getMemberId() ||
+                             storedCopyId != copy.getCopyId() ||
+                             status != ReservationStatus.READY_FOR_PICKUP ||
+                             expirationSqlDate == null ||
+                             borrowDate.isAfter(expirationSqlDate.toLocalDate())) {
+
+                         throw new IllegalStateException(
+                                 "Reservation cannot be collected");
+                     }
+                 }
+             }
+
+             // 2. Change the copy from RESERVED to BORROWED
+             try (PreparedStatement statement =
+                     connection.prepareStatement(updateCopySql)) {
+
+                 statement.setString(1, CopyStatus.BORROWED.name());
+                 statement.setInt(2, copy.getCopyId());
+                 statement.setString(3, CopyStatus.RESERVED.name());
+
+                 if (statement.executeUpdate() != 1) {
+                     throw new SQLException(
+                             "Could not update the book copy");
+                 }
+             }
+
+             // 3. Insert the new borrowing record
+             int borrowId;
+
+             try (PreparedStatement statement =
+                     connection.prepareStatement(
+                             insertBorrowSql,
+                             Statement.RETURN_GENERATED_KEYS)) {
+
+                 statement.setInt(1, member.getMemberId());
+                 statement.setInt(2, copy.getCopyId());
+                 statement.setDate(
+                         3, java.sql.Date.valueOf(borrowDate));
+                 statement.setDate(
+                         4, java.sql.Date.valueOf(expectedReturnDate));
+                 statement.setString(
+                         5, BorrowStatus.ACTIVE.name());
+
+                 statement.executeUpdate();
+
+                 try (ResultSet keys = statement.getGeneratedKeys()) {
+
+                     if (!keys.next()) {
+                         throw new SQLException(
+                                 "Borrow ID was not generated");
+                     }
+
+                     borrowId = keys.getInt(1);
+                 }
+             }
+
+             // 4. Mark the reservation as FULFILLED
+             try (PreparedStatement statement =
+                     connection.prepareStatement(updateReservationSql)) {
+
+                 statement.setString(
+                         1, ReservationStatus.FULFILLED.name());
+                 statement.setInt(2, reservationId);
+                 statement.setString(
+                         3, ReservationStatus.READY_FOR_PICKUP.name());
+                 statement.setInt(4, copy.getCopyId());
+                 statement.setDate(
+                         5, java.sql.Date.valueOf(borrowDate));
+
+                 if (statement.executeUpdate() != 1) {
+                     throw new SQLException(
+                             "Could not fulfill the reservation");
+                 }
+             }
+
+             // Save all three database changes
+             connection.commit();
+
+             return borrowId;
+
+         } catch (SQLException | RuntimeException e) {
+
+             connection.rollback();
+             throw e;
+         }
+     }
+ }
+//Count a member's active and overdue borrowings
+public int countOutstandingBorrowings(int memberId)
+      throws SQLException {
+
+  String sql = """
+          SELECT COUNT(*)
+          FROM borrows
+          WHERE member_id = ?
+          AND status IN ('ACTIVE', 'OVERDUE')
+          """;
+
+  try (Connection connection = DatabaseConnection.getConnection();
+       PreparedStatement statement = connection.prepareStatement(sql)) {
+
+      statement.setInt(1, memberId);
+
+      try (ResultSet result = statement.executeQuery()) {
+
+          if (result.next()) {
+              return result.getInt(1);
+          }
+
+          return 0;
+      }
+  }
 }
+//Retrieve all borrowing records belonging to a member
+public ArrayList<Borrow> findBorrowingsByMember(int memberId)
+     throws SQLException {
+
+ String sql = """
+         SELECT
+             br.borrow_id,
+             br.borrow_date,
+             br.expected_return_date,
+             br.actual_return_date,
+             br.status,
+             m.member_id,
+             m.full_name,
+             m.email,
+             m.phone_number,
+             bc.copy_id,
+             bc.status AS copy_status,
+             b.book_id,
+             b.title,
+             b.author,
+             b.publication_year
+         FROM borrows br
+         JOIN members m
+             ON br.member_id = m.member_id
+         JOIN book_copies bc
+             ON br.copy_id = bc.copy_id
+         JOIN books b
+             ON bc.book_id = b.book_id
+         WHERE br.member_id = ?
+         ORDER BY br.borrow_id
+         """;
+
+ ArrayList<Borrow> result = new ArrayList<>();
+
+ try (Connection connection = DatabaseConnection.getConnection();
+      PreparedStatement statement = connection.prepareStatement(sql)) {
+
+     statement.setInt(1, memberId);
+
+     try (ResultSet rs = statement.executeQuery()) {
+
+         while (rs.next()) {
+
+             Member member = new Member(
+                     rs.getString("full_name"),
+                     rs.getString("email"),
+                     rs.getString("phone_number"),
+                     rs.getInt("member_id")
+             );
+
+             Book book = new Book(
+                     rs.getString("title"),
+                     rs.getString("author"),
+                     rs.getInt("book_id"),
+                     rs.getInt("publication_year")
+             );
+
+             BookCopy copy = new BookCopy(
+                     rs.getInt("copy_id"),
+                     book,
+                     CopyStatus.valueOf(rs.getString("copy_status"))
+             );
+
+             LocalDate borrowDate =
+                     rs.getDate("borrow_date").toLocalDate();
+
+             LocalDate expectedReturnDate =
+                     rs.getDate("expected_return_date").toLocalDate();
+
+             Date actualReturn = rs.getDate("actual_return_date");
+
+             LocalDate actualReturnDate = (actualReturn == null)
+                     ? null
+                     : actualReturn.toLocalDate();
+
+             BorrowStatus status =
+                     BorrowStatus.valueOf(rs.getString("status"));
+
+             Borrow borrow = new Borrow(
+                     rs.getInt("borrow_id"),
+                     member,
+                     copy,
+                     borrowDate,
+                     expectedReturnDate,
+                     actualReturnDate,
+                     status
+             );
+
+             result.add(borrow);
+         }
+     }
+ }
+
+ return result;
+}
+//Count all borrowing records in the database
+public int countBorrowings() throws SQLException {
+
+ String sql = """
+         SELECT COUNT(*)
+         FROM borrows
+         """;
+
+ try (Connection connection = DatabaseConnection.getConnection();
+      PreparedStatement statement = connection.prepareStatement(sql);
+      ResultSet result = statement.executeQuery()) {
+
+     if (result.next()) {
+         return result.getInt(1);
+     }
+
+     return 0;
+ }
+}
+public ArrayList<Borrow> findAllBorrowings() throws SQLException {
+
+    String sql = """
+            SELECT
+                br.borrow_id,
+                br.borrow_date,
+                br.expected_return_date,
+                br.actual_return_date,
+                br.status,
+
+                m.member_id,
+                m.full_name,
+                m.email,
+                m.phone_number,
+
+                bc.copy_id,
+                bc.status AS copy_status,
+
+                b.book_id,
+                b.title,
+                b.author,
+                b.publication_year
+
+            FROM borrows br
+
+            JOIN members m
+                ON br.member_id = m.member_id
+
+            JOIN book_copies bc
+                ON br.copy_id = bc.copy_id
+
+            JOIN books b
+                ON bc.book_id = b.book_id
+
+            ORDER BY br.borrow_id
+            """;
+
+    ArrayList<Borrow> result = new ArrayList<>();
+
+    try (Connection connection = DatabaseConnection.getConnection();
+         PreparedStatement statement = connection.prepareStatement(sql);
+         ResultSet rs = statement.executeQuery()) {
+
+        while (rs.next()) {
+
+        	// Reconstruct Member
+        	Member member = new Member(
+        	        rs.getString("full_name"),
+        	        rs.getString("email"),
+        	        rs.getString("phone_number"),
+        	        rs.getInt("member_id")
+        	);
+
+        	// Reconstruct Book
+        	Book book = new Book(
+        	        rs.getString("title"),
+        	        rs.getString("author"),
+        	        rs.getInt("book_id"),
+        	        rs.getInt("publication_year")
+        	);
+
+            // Reconstruct BookCopy
+            BookCopy copy = new BookCopy(
+                    rs.getInt("copy_id"),
+                    book,
+                    CopyStatus.valueOf(rs.getString("copy_status"))
+            );
+
+            // Reconstruct Borrow
+            Borrow borrow = new Borrow(
+                    rs.getInt("borrow_id"),
+                    member,
+                    copy,
+                    rs.getDate("borrow_date").toLocalDate(),
+                    rs.getDate("expected_return_date").toLocalDate(),
+                    rs.getDate("actual_return_date") != null
+                            ? rs.getDate("actual_return_date").toLocalDate()
+                            : null,
+                    BorrowStatus.valueOf(rs.getString("status"))
+            );
+
+            result.add(borrow);
+        }
+    }
+
+    return result;
+}
+//Mark active borrowings as overdue when their expected return date has passed
+public int updateOverdueBorrowings() throws SQLException {
+
+ String sql = """
+         UPDATE borrows
+         SET status = ?
+         WHERE status = ?
+         AND expected_return_date < ?
+         """;
+
+ try (Connection connection = DatabaseConnection.getConnection();
+      PreparedStatement statement = connection.prepareStatement(sql)) {
+
+     statement.setString(1, BorrowStatus.OVERDUE.name());
+     statement.setString(2, BorrowStatus.ACTIVE.name());
+     statement.setDate(3, Date.valueOf(LocalDate.now()));
+
+     return statement.executeUpdate();
+ }
+}
+}
+

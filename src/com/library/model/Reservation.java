@@ -36,7 +36,48 @@ public class Reservation {
         this.reservationDate = LocalDate.now();
         this.status = ReservationStatus.WAITING;
     }
+ // Constructor used to reconstruct an existing reservation from the database
+    public Reservation(
+            int reservationId,
+            Member member,
+            Book book,
+            LocalDate reservationDate,
+            LocalDate expirationDate,
+            BookCopy assignedCopy,
+            ReservationStatus status) {
 
+        if (member == null || book == null ||
+                reservationDate == null || status == null) {
+            throw new IllegalArgumentException(
+                    "Required reservation information cannot be null");
+        }
+
+        this.reservationId = reservationId;
+        this.member = member;
+        this.book = book;
+        this.reservationDate = reservationDate;
+        this.expirationDate = expirationDate;
+        this.assignedCopy = assignedCopy;
+        this.status = status;
+    }
+ // Constructor for creating a new reservation with a database-generated ID
+    public Reservation(
+            int reservationId,
+            Member member,
+            Book book,
+            LocalDate reservationDate) {
+
+        if (member == null || book == null || reservationDate == null) {
+            throw new IllegalArgumentException(
+                    "Member, book and reservation date cannot be null");
+        }
+
+        this.reservationId = reservationId;
+        this.member = member;
+        this.book = book;
+        this.reservationDate = reservationDate;
+        this.status = ReservationStatus.WAITING;
+    }
     // Getters
     public int getReservationId() {
         return reservationId;
@@ -69,35 +110,41 @@ public class Reservation {
     // Methods
 
     /**
-     * Assigns an available physical copy to this reservation.
-     * Changes the copy status to RESERVED and the reservation
-     * status to READY_FOR_PICKUP.
-     * The member has three days to collect the book.
-     *
-     * @param copy the available physical copy assigned to the reservation
+     * Assigns a copy using the default three-day pickup period.
      */
     public void assignCopy(BookCopy copy) {
-        // Check that the copy is not null
-        if (copy == null) {
-            throw new IllegalArgumentException("Assigned book cannot be null");
+        assignCopy(copy, LocalDate.now().plusDays(3));
+    }
+
+    /**
+     * Assigns an available physical copy using a specified expiration date.
+     */
+    public void assignCopy(BookCopy copy, LocalDate expirationDate) {
+
+        // Validate inputs
+        if (copy == null || expirationDate == null) {
+            throw new IllegalArgumentException(
+                    "Copy and expiration date cannot be null");
         }
-        // Ensure the physical copy belongs to the reserved book
+
+        // Verify that the copy belongs to this book
         if (copy.getBook().getBookId() != book.getBookId()) {
             throw new IllegalArgumentException(
-                "Copy does not belong to this book"
-            );
+                    "Copy does not belong to this book");
         }
-        // Ensure the reservation is waiting and the copy is available
+
+        // Verify that the reservation and copy are eligible
         if (assignedCopy != null ||
                 status != ReservationStatus.WAITING ||
                 copy.getStatus() != CopyStatus.AVAILABLE) {
             throw new IllegalStateException("Cannot assign this copy");
         }
 
+        // Perform the assignment
         assignedCopy = copy;
         copy.setStatus(CopyStatus.RESERVED);
         status = ReservationStatus.READY_FOR_PICKUP;
-        expirationDate = LocalDate.now().plusDays(3);
+        this.expirationDate = expirationDate;
     }
 
     /**
