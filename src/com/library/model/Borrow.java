@@ -11,23 +11,64 @@ public class Borrow {
 	private LocalDate expectedReturnDate;
 	private LocalDate actualReturnDate;
 
-	// Constructor :
+
+	// Constructor used to create a new borrowing
 	public Borrow(int borrowId, Member member, BookCopy bookCopy,
-            LocalDate expectedReturnDate) {
-		if (member == null || bookCopy == null) {
-		    throw new IllegalArgumentException("Member and book copy cannot be null");
-		}
-		this.borrowId = borrowId;
-		this.member = member;
-		this.bookCopy = bookCopy;
-		this.status = BorrowStatus.ACTIVE;
-		this.borrowDate = LocalDate.now();
-		if (expectedReturnDate == null || !expectedReturnDate.isAfter(borrowDate)) {
-		    throw new IllegalArgumentException("Invalid expected return date");
-		}
-		this.expectedReturnDate = expectedReturnDate;
-		this.actualReturnDate = null;
+	        LocalDate expectedReturnDate) {
+
+	    if (member == null || bookCopy == null) {
+	        throw new IllegalArgumentException(
+	                "Member and book copy cannot be null");
+	    }
+
+	    this.borrowDate = LocalDate.now();
+
+	    if (expectedReturnDate == null ||
+	            !expectedReturnDate.isAfter(borrowDate)) {
+	        throw new IllegalArgumentException(
+	                "Invalid expected return date");
+	    }
+
+	    this.borrowId = borrowId;
+	    this.member = member;
+	    this.bookCopy = bookCopy;
+	    this.expectedReturnDate = expectedReturnDate;
+	    this.actualReturnDate = null;
+	    this.status = BorrowStatus.ACTIVE;
 	}
+	// Restore an existing borrowing from the database
+	public Borrow(int borrowId, Member member, BookCopy bookCopy,
+	        LocalDate borrowDate, LocalDate expectedReturnDate,
+	        LocalDate actualReturnDate, BorrowStatus status) {
+
+	    if (member == null || bookCopy == null || borrowDate == null
+	            || expectedReturnDate == null || status == null) {
+	        throw new IllegalArgumentException("Invalid borrowing data");
+	    }
+
+	    if (!expectedReturnDate.isAfter(borrowDate)) {
+	        throw new IllegalArgumentException("Invalid expected return date");
+	    }
+
+	    if (status == BorrowStatus.RETURNED && actualReturnDate == null) {
+	        throw new IllegalArgumentException(
+	                "Returned borrowing needs an actual return date");
+	    }
+
+	    if (status != BorrowStatus.RETURNED && actualReturnDate != null) {
+	        throw new IllegalArgumentException(
+	                "Only returned borrowings can have an actual return date");
+	    }
+
+	    this.borrowId = borrowId;
+	    this.member = member;
+	    this.bookCopy = bookCopy;
+	    this.borrowDate = borrowDate;
+	    this.expectedReturnDate = expectedReturnDate;
+	    this.actualReturnDate = actualReturnDate;
+	    this.status = status;
+	}
+
 	
 	// getter :
 	
