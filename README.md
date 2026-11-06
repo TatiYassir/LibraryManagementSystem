@@ -274,39 +274,37 @@ java --module-path "bin;lib" -m LibraryManagementSystem/com.library.ui.Main
 The following screenshots demonstrate the application's main features and database design.
 
 ### 1. Main Menu
-![Main Menu](Screenshots/01-main-menu.png)
+![Main Menu](screenshots/01-main-menu.png)
 
 ### 2. All Books
-![All Books](Screenshots/02-all-books.png)
+![All Books](screenshots/02-all-books.png)
 
 ### 3. Book Menu
-![Book Menu](Screenshots/02-book-menu.png)
+![Book Menu](screenshots/02-book-menu.png)
 
 ### 4. Physical Book Copies
-![All Book Copies](Screenshots/03-all-book-copies.png)
+![All Book Copies](screenshots/03-all-book-copies.png)
 
 ### 5. Borrowing History
-![Borrowing History](Screenshots/04-borrowing-history.png)
+![Borrowing History](screenshots/04-borrowing-history.png)
 
 ### 6. Successful Borrowing
-![Successful Borrowing](Screenshots/05-successful-borrowing.png)
+![Successful Borrowing](screenshots/05-successful-borrowing.png)
 
 ### 7. Borrowing History After New Borrowing
-![Borrowing History After New Borrowing](Screenshots/06-borrowing-history-after-new-borrowing.png)
+![Borrowing History After New Borrowing](screenshots/06-borrowing-history-after-new-borrowing.png)
 
 ### 8. Successful Return
-![Successful Return](Screenshots/06-successful-return.png)
+![Successful Return](screenshots/06-successful-return.png)
 
 ### 9. Reservation History
-![Reservation History](Screenshots/07-reservation-history.png)
+![Reservation History](screenshots/07-reservation-history.png)
 
 ### 10. Library Statistics
-![Library Statistics](Screenshots/08-library-statistics.png)
+![Library Statistics](screenshots/08-library-statistics.png)
 
 ### 11. Database Structure Diagram
-![Database Structure Diagram](Screenshots/mermaid-diagram.png)
-![Database Structure](screenshots/10-database-structure.png)
-
+![Database Structure Diagram](screenshots/mermaid-diagram.png)
 ---
 
 ## 🔁 Domain Entity Lifecycles
