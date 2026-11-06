@@ -14,16 +14,14 @@ import com.library.enums.BorrowStatus;
 import java.sql.SQLException;
 import com.library.repository.BorrowRepository;
 import com.library.enums.ReservationStatus;
+
 public class BorrowService {
 
     // Attributes
-	// Handles borrowing database operations
-	private final BorrowRepository borrowRepository =
-	        new BorrowRepository();
+    private final BorrowRepository borrowRepository = new BorrowRepository();
     private final ReservationService reservationService;
     private final ArrayList<Borrow> borrows = new ArrayList<>();
     
-    // Constructor :
     /**
      * Creates a borrowing service connected to a reservation service.
      *
@@ -31,13 +29,12 @@ public class BorrowService {
      *                           to waiting reservations
      * @throws IllegalArgumentException if the service is null
      */
-    public BorrowService (ReservationService reservationService ) {
-    	if (reservationService == null) {
-    	    throw new IllegalArgumentException("ReservationService cannot be null");
-    	}
-    	this.reservationService = reservationService;
+    public BorrowService(ReservationService reservationService) {
+        if (reservationService == null) {
+            throw new IllegalArgumentException("ReservationService cannot be null");
+        }
+        this.reservationService = reservationService;
     }
-    // Methods
 
     /**
      * Borrows an available physical book copy for a member.
@@ -55,8 +52,7 @@ public class BorrowService {
 
         // Check copy availability
         if (copy.getStatus() != CopyStatus.AVAILABLE) {
-            throw new IllegalStateException(
-                    "This copy is not available");
+            throw new IllegalStateException("This copy is not available");
         }
 
         // Count outstanding borrowings directly from MariaDB
@@ -69,10 +65,9 @@ public class BorrowService {
                     "Member has reached the borrowing limit");
         }
 
-        // Create a temporary Borrow object for repository insertion
-        // (ID 0 is a placeholder: MariaDB generates the real ID)
+        // Create a temporary Borrow object for repository insertion (ID 1 is a placeholder)
         Borrow draft = new Borrow(
-                0,
+                1,
                 member,
                 copy,
                 expectedReturnDate
@@ -100,15 +95,14 @@ public class BorrowService {
 
         return borrow;
     }
-// Methods :
+
     /**
      * Returns a borrowed book and updates MariaDB.
      */
     public void returnBook(Borrow borrow) throws SQLException {
 
         if (borrow == null) {
-            throw new IllegalArgumentException(
-                    "Borrow cannot be null");
+            throw new IllegalArgumentException("Borrow cannot be null");
         }
 
         // Verify that this borrowing belongs to the service
@@ -147,10 +141,6 @@ public class BorrowService {
     
     /**
      * Searches for a borrowing record using its unique ID.
-     *
-     * @param borrowId the ID of the borrowing record
-     * @return the matching borrowing record, or null if not found
-     * @throws SQLException if a database error occurs
      */
     public Borrow findBorrowById(int borrowId) throws SQLException {
 
@@ -171,48 +161,73 @@ public class BorrowService {
 
         return borrow;
     }
-    
+
+    /**
+     * Displays borrowing records with clean spacing aligned to 105 characters.
+     */
+    private void displayBorrowingTable(ArrayList<Borrow> borrowings) {
+
+        System.out.println();
+        System.out.println("==================================== BORROWING HISTORY ====================================");
+        System.out.printf(
+            "%-4s %-18s %-20s %-6s %-12s %-12s %-12s %-10s%n",
+            "ID", "MEMBER", "BOOK", "COPY",
+            "BORROWED", "DUE DATE", "RETURNED", "STATUS"
+        );
+
+        System.out.println("-".repeat(100));
+
+        for (Borrow borrow : borrowings) {
+
+            String member = borrow.getMember().getFullName();
+            String book = borrow.getBookCopy().getBook().getTitle();
+
+            System.out.printf(
+                "%-4d %-18.18s %-20.20s %-6d %-12s %-12s %-12s %-10s%n",
+                borrow.getBorrowId(),
+                member,
+                book,
+                borrow.getBookCopy().getCopyId(),
+                borrow.getBorrowDate(),
+                borrow.getExpectedReturnDate(),
+                borrow.getActualReturnDate() == null
+                    ? "-"
+                    : borrow.getActualReturnDate(),
+                borrow.getStatus()
+            );
+        }
+
+        System.out.println("-".repeat(100));
+        System.out.println("Total borrowing records: " + borrowings.size());
+    }
     /**
      * Displays all borrowing records retrieved from MariaDB.
-     * Displays a message if no borrowing records exist.
      */
     public void displayAllBorrowings() throws SQLException {
 
-        // Retrieve all borrowing records from MariaDB
-        ArrayList<Borrow> result =
-                borrowRepository.findAllBorrowings();
+        ArrayList<Borrow> result = borrowRepository.findAllBorrowings();
 
-        // Check whether any records exist
         if (result.isEmpty()) {
             System.out.println("No borrowing records found.");
             return;
         }
 
-        // Display all borrowing records
-        for (Borrow borrow : result) {
-            System.out.println(borrow);
-        }
+        displayBorrowingTable(result);
     }
-    
+
     /**
      * Finds all borrowing records belonging to a specific member.
-     *
-     * @param memberId the ID of the member
-     * @return a new list containing the member's borrowing records
      */
     public ArrayList<Borrow> findBorrowingsByMember(int memberId)
             throws SQLException {
 
-        // Retrieve borrowing history from MariaDB
         ArrayList<Borrow> databaseResults =
                 borrowRepository.findBorrowingsByMember(memberId);
 
-        // Synchronize the results with the local cache
         ArrayList<Borrow> result = new ArrayList<>();
 
         for (Borrow databaseBorrow : databaseResults) {
 
-            // Look in memory only: the row is already loaded from MariaDB
             Borrow cachedBorrow = null;
 
             for (Borrow current : borrows) {
@@ -232,6 +247,7 @@ public class BorrowService {
 
         return result;
     }
+
     /**
      * Updates overdue statuses, then returns every overdue borrowing.
      */
@@ -269,8 +285,6 @@ public class BorrowService {
 
     /**
      * Returns the total number of borrowing records.
-     *
-     * @return the number of borrowing records stored
      */
     public int getTotalBorrowings() throws SQLException {
         return borrowRepository.countBorrowings();
@@ -278,30 +292,22 @@ public class BorrowService {
     
     /**
      * Displays the borrowing history of a specific member.
-     *
-     * @param memberId the ID of the member
      */
     public void displayBorrowingsByMember(int memberId)
             throws SQLException {
-    	ArrayList<Borrow> result = findBorrowingsByMember(memberId);
-    	if (result.isEmpty()) {
-    	    System.out.println("This member has no borrowing history.");
-    	    return;
-    	}
-    	for (Borrow borrow : result) {
-    	    System.out.println(borrow);
-    	}
+
+        ArrayList<Borrow> result = findBorrowingsByMember(memberId);
+
+        if (result.isEmpty()) {
+            System.out.println("This member has no borrowing history.");
+            return;
+        }
+
+        displayBorrowingTable(result);
     }
+
     /**
      * Collects a reserved book copy and creates a new borrowing record.
-     * Checks the member's borrowing limit before fulfilling the reservation.
-     *
-     * @param reservation the reservation being collected
-     * @param expectedReturnDate the expected return date
-     * @return the newly created borrowing record
-     * @throws IllegalArgumentException if the reservation is null
-     * @throws IllegalStateException if no copy is assigned, the borrowing
-     *         limit is reached, or the reservation cannot be fulfilled
      */
     public Borrow collectReservation(
             Reservation reservation,
@@ -351,7 +357,7 @@ public class BorrowService {
                     "Expected return date must be after today");
         }
 
-     // Count outstanding borrowings directly from MariaDB
+        // Count outstanding borrowings directly from MariaDB
         int activeBorrowings =
                 borrowRepository.countOutstandingBorrowings(
                         member.getMemberId());
@@ -369,7 +375,7 @@ public class BorrowService {
                 expectedReturnDate
         );
 
-        // Create the Java borrowing object using the database ID
+        // Reconstruct the actual Borrow object with the database-generated ID
         Borrow borrow = new Borrow(
                 borrowId,
                 member,

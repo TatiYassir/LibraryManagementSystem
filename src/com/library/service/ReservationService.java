@@ -17,192 +17,234 @@ import com.library.repository.BookCopyRepository;
 public class ReservationService {
 
     // Attributes
-	// Stores all reservation records, including completed and cancelled ones
-	private final ArrayList<Reservation> reservations = new ArrayList<>();
+    // Stores all reservation records, including completed and cancelled ones
+    private final ArrayList<Reservation> reservations = new ArrayList<>();
 
-	// Handles reservation database operations
-	private final ReservationRepository reservationRepository =
-	        new ReservationRepository();
+    // Handles reservation database operations
+    private final ReservationRepository reservationRepository =
+            new ReservationRepository();
 
-	// Used to find a free copy when a reservation is created
-	private final BookCopyRepository bookCopyRepository =
-	        new BookCopyRepository();
+    // Used to find a free copy when a reservation is created
+    private final BookCopyRepository bookCopyRepository =
+            new BookCopyRepository();
 
     // Methods
 
-	/**
-	 * Creates and stores a new reservation for a member.
-	 * MariaDB generates the reservation ID.
-	 *
-	 * @param member the member making the reservation
-	 * @param book the book being reserved
-	 * @return the newly created reservation
-	 */
-	public Reservation reserve(Member member, Book book)
-	        throws SQLException {
+    /**
+     * Creates and stores a new reservation for a member.
+     * MariaDB generates the reservation ID.
+     *
+     * @param member the member making the reservation
+     * @param book the book being reserved
+     * @return the newly created reservation
+     */
+    public Reservation reserve(Member member, Book book)
+            throws SQLException {
 
-	    // Validate input
-	    if (member == null || book == null) {
-	        throw new IllegalArgumentException(
-	                "Member and book cannot be null");
-	    }
-
-	    // A member cannot hold two open reservations for the same book
-	    for (Reservation existing :
-	            findReservationsByMember(member.getMemberId())) {
-
-	        boolean open =
-	                existing.getStatus() == ReservationStatus.WAITING
-	                || existing.getStatus() == ReservationStatus.READY_FOR_PICKUP;
-
-	        if (open && existing.getBook().getBookId() == book.getBookId()) {
-	            throw new IllegalStateException(
-	                    "This member already has an open reservation for this book");
-	        }
-	    }
-
-	    // Get the reservation date
-	    LocalDate reservationDate = LocalDate.now();
-
-	    // Save the reservation in the database
-	    int reservationId = reservationRepository.addReservation(
-	            member, book, reservationDate);
-
-	    // Create the Java object using the database-generated ID
-	    Reservation reservation = new Reservation(
-	            reservationId,
-	            member,
-	            book,
-	            reservationDate
-	    );
-
-	    // Store the reservation in memory
-	    reservations.add(reservation);
-
-	    // If copies are free right now, hand them to the waiting queue
-	    // (first come, first served) instead of leaving them idle
-	    for (BookCopy copy :
-	            bookCopyRepository.findCopiesByBookId(book.getBookId())) {
-
-	        if (copy.getStatus() == CopyStatus.AVAILABLE
-	                && !assignNextReservation(book, copy)) {
-	            break;
-	        }
-	    }
-
-	    return reservation;
-	}
-
-	/**
- * Expires every READY_FOR_PICKUP reservation whose pickup deadline
- * has passed, releasing or reassigning its held copy.
- *
- * @return the results of all expired reservations
- */
-public ArrayList<ExpiredReservationResult> expireOverdueReservations()
-        throws SQLException {
-
-    ArrayList<ExpiredReservationResult> expiredResults =
-            new ArrayList<>();
-
-    for (Reservation databaseReservation :
-            reservationRepository.findAllReservations()) {
-
-        if (databaseReservation.getStatus()
-                != ReservationStatus.READY_FOR_PICKUP) {
-            continue;
+        // Validate input
+        if (member == null || book == null) {
+            throw new IllegalArgumentException(
+                    "Member and book cannot be null");
         }
 
-        LocalDate deadline = databaseReservation.getExpirationDate();
+        // A member cannot hold two open reservations for the same book
+        for (Reservation existing :
+                findReservationsByMember(member.getMemberId())) {
 
-        if (deadline == null || !LocalDate.now().isAfter(deadline)) {
-            continue;
+            boolean open =
+                    existing.getStatus() == ReservationStatus.WAITING
+                    || existing.getStatus() == ReservationStatus.READY_FOR_PICKUP;
+
+            if (open && existing.getBook().getBookId() == book.getBookId()) {
+                throw new IllegalStateException(
+                        "This member already has an open reservation for this book");
+            }
         }
 
-        Reservation tracked =
-                findReservationById(databaseReservation.getReservationId());
+        // Get the reservation date
+        LocalDate reservationDate = LocalDate.now();
 
-        // Expire the reservation and check whether its copy was reassigned
-        boolean copyReassigned = expireReservation(tracked);
+        // Save the reservation in the database
+        int reservationId = reservationRepository.addReservation(
+                member, book, reservationDate);
 
-        // Keep the reservation and reassignment result together
-        expiredResults.add(
-                new ExpiredReservationResult(tracked, copyReassigned)
+        // Create the Java object using the database-generated ID
+        Reservation reservation = new Reservation(
+                reservationId,
+                member,
+                book,
+                reservationDate
         );
+
+        // Store the reservation in memory
+        reservations.add(reservation);
+
+        // If copies are free right now, hand them to the waiting queue
+        // (first come, first served) instead of leaving them idle
+        for (BookCopy copy :
+                bookCopyRepository.findCopiesByBookId(book.getBookId())) {
+
+            if (copy.getStatus() == CopyStatus.AVAILABLE
+                    && !assignNextReservation(book, copy)) {
+                break;
+            }
+        }
+
+        return reservation;
     }
 
-    return expiredResults;
-}
+    /**
+     * Expires every READY_FOR_PICKUP reservation whose pickup deadline
+     * has passed, releasing or reassigning its held copy.
+     *
+     * @return the results of all expired reservations
+     */
+    public ArrayList<ExpiredReservationResult> expireOverdueReservations()
+            throws SQLException {
 
-	/**
-	 * Searches for a reservation using its unique ID.
-	 *
-	 * First searches the in-memory list.
-	 * If not found, searches the database.
-	 *
-	 * @param reservationId the ID of the reservation
-	 * @return the matching reservation, or null if not found
-	 */
-	public Reservation findReservationById(int reservationId)
-	        throws SQLException {
+        ArrayList<ExpiredReservationResult> expiredResults =
+                new ArrayList<>();
 
-	    // First, search the in-memory list
-	    for (Reservation reservation : reservations) {
-	        if (reservationId == reservation.getReservationId()) {
-	            return reservation;
-	        }
-	    }
-	    
+        for (Reservation databaseReservation :
+                reservationRepository.findAllReservations()) {
 
-	    // If not found in memory, search MariaDB
-	    Reservation reservation =
-	            reservationRepository.findReservationById(reservationId);
+            if (databaseReservation.getStatus()
+                    != ReservationStatus.READY_FOR_PICKUP) {
+                continue;
+            }
 
-	    // Cache the retrieved reservation
-	    if (reservation != null) {
-	        reservations.add(reservation);
-	    }
+            LocalDate deadline = databaseReservation.getExpirationDate();
 
-	    return reservation;
-	}
+            if (deadline == null || !LocalDate.now().isAfter(deadline)) {
+                continue;
+            }
 
-	/**
-	 * Displays all reservation records stored in MariaDB.
-	 */
-	public void displayAllReservations() throws SQLException {
+            Reservation tracked =
+                    findReservationById(databaseReservation.getReservationId());
 
-	    // Retrieve all reservations from the database
-	    ArrayList<Reservation> databaseReservations =
-	            reservationRepository.findAllReservations();
+            // Expire the reservation and check whether its copy was reassigned
+            boolean copyReassigned = expireReservation(tracked);
 
-	    if (databaseReservations.isEmpty()) {
-	        System.out.println("No reservation records found.");
-	        return;
-	    }
+            // Keep the reservation and reassignment result together
+            expiredResults.add(
+                    new ExpiredReservationResult(tracked, copyReassigned)
+            );
+        }
 
-	    for (Reservation databaseReservation : databaseReservations) {
+        return expiredResults;
+    }
 
-	        Reservation reservationToDisplay = databaseReservation;
+    /**
+     * Searches for a reservation using its unique ID.
+     *
+     * First searches the in-memory list.
+     * If not found, searches the database.
+     *
+     * @param reservationId the ID of the reservation
+     * @return the matching reservation, or null if not found
+     */
+    public Reservation findReservationById(int reservationId)
+            throws SQLException {
 
-	        // Check whether this reservation is already cached
-	        for (Reservation cachedReservation : reservations) {
+        // First, search the in-memory list
+        for (Reservation reservation : reservations) {
+            if (reservationId == reservation.getReservationId()) {
+                return reservation;
+            }
+        }
 
-	            if (cachedReservation.getReservationId()
-	                    == databaseReservation.getReservationId()) {
+        // If not found in memory, search MariaDB
+        Reservation reservation =
+                reservationRepository.findReservationById(reservationId);
 
-	                reservationToDisplay = cachedReservation;
-	                break;
-	            }
-	        }
+        // Cache the retrieved reservation
+        if (reservation != null) {
+            reservations.add(reservation);
+        }
 
-	        // Cache it if it is not already in memory
-	        if (!reservations.contains(reservationToDisplay)) {
-	            reservations.add(reservationToDisplay);
-	        }
+        return reservation;
+    }
 
-	        System.out.println(reservationToDisplay);
-	    }
-	}
+    /**
+     * Displays reservation records in a clean, aligned console table.
+     */
+    private void displayReservationTable(ArrayList<Reservation> reservationList) {
+
+        System.out.println();
+        System.out.println("==================================== RESERVATION HISTORY ====================================");
+        System.out.printf(
+            "%-4s %-18s %-20s %-8s %-12s %-12s %-18s%n",
+            "ID", "MEMBER", "BOOK", "COPY",
+            "RESERVED", "EXPIRATION", "STATUS"
+        );
+
+        System.out.println("-".repeat(96));
+
+        for (Reservation res : reservationList) {
+
+            String member = res.getMember().getFullName();
+            String book = res.getBook().getTitle();
+            String copyIdStr = (res.getAssignedCopy() == null)
+                    ? "-"
+                    : String.valueOf(res.getAssignedCopy().getCopyId());
+
+            System.out.printf(
+                "%-4d %-18.18s %-20.20s %-8s %-12s %-12s %-18s%n",
+                res.getReservationId(),
+                member,
+                book,
+                copyIdStr,
+                res.getReservationDate(),
+                res.getExpirationDate() == null ? "-" : res.getExpirationDate(),
+                res.getStatus()
+            );
+        }
+
+        System.out.println("-".repeat(96));
+        System.out.println("Total reservation records: " + reservationList.size());
+    }
+
+    /**
+     * Displays all reservation records stored in MariaDB.
+     */
+    public void displayAllReservations() throws SQLException {
+
+        // Retrieve all reservations from the database
+        ArrayList<Reservation> databaseReservations =
+                reservationRepository.findAllReservations();
+
+        if (databaseReservations.isEmpty()) {
+            System.out.println("No reservation records found.");
+            return;
+        }
+
+        ArrayList<Reservation> toDisplay = new ArrayList<>();
+
+        for (Reservation databaseReservation : databaseReservations) {
+
+            Reservation reservationToDisplay = databaseReservation;
+
+            // Check whether this reservation is already cached
+            for (Reservation cachedReservation : reservations) {
+
+                if (cachedReservation.getReservationId()
+                        == databaseReservation.getReservationId()) {
+
+                    reservationToDisplay = cachedReservation;
+                    break;
+                }
+            }
+
+            // Cache it if it is not already in memory
+            if (!reservations.contains(reservationToDisplay)) {
+                reservations.add(reservationToDisplay);
+            }
+
+            toDisplay.add(reservationToDisplay);
+        }
+
+        displayReservationTable(toDisplay);
+    }
 
     /**
      * Finds all reservations belonging to a specific member.
@@ -260,9 +302,7 @@ public ArrayList<ExpiredReservationResult> expireOverdueReservations()
             return;
         }
 
-        for (Reservation reservation : result) {
-            System.out.println(reservation);
-        }
+        displayReservationTable(result);
     }
 
     /**
@@ -273,6 +313,7 @@ public ArrayList<ExpiredReservationResult> expireOverdueReservations()
     public int getTotalReservations() throws SQLException {
         return reservationRepository.countReservations();
     }
+
     /**
      * Assigns an available copy to the first waiting reservation
      * and saves the changes in MariaDB.
@@ -329,7 +370,7 @@ public ArrayList<ExpiredReservationResult> expireOverdueReservations()
         if (reservation != null) {
 
             // Synchronize the existing Java objects
-        	reservation.assignCopy(copy, expirationDate);
+            reservation.assignCopy(copy, expirationDate);
 
         } else {
 
@@ -350,6 +391,7 @@ public ArrayList<ExpiredReservationResult> expireOverdueReservations()
 
         return true;
     }
+
     /**
      * Cancels a reservation and reassigns its copy if another
      * reservation is waiting for the same book.
@@ -434,6 +476,7 @@ public ArrayList<ExpiredReservationResult> expireOverdueReservations()
             reservations.add(nextReservation);
         }
     }
+
     /**
      * Expires a reservation and reassigns its copy if another
      * reservation is waiting for the same book.
@@ -530,10 +573,3 @@ public ArrayList<ExpiredReservationResult> expireOverdueReservations()
         return true;
     }
 }
-
-
-
-
-
-
-
