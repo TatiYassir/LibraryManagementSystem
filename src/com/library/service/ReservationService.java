@@ -6,6 +6,7 @@ import com.library.model.Member;
 import com.library.model.Book;
 import com.library.model.BookCopy;
 import com.library.model.Reservation;
+import com.library.model.ExpiredReservationResult;
 import com.library.enums.CopyStatus;
 import com.library.enums.ReservationStatus;
 import java.sql.SQLException;
@@ -93,39 +94,45 @@ public class ReservationService {
 	}
 
 	/**
-	 * Expires every READY_FOR_PICKUP reservation whose pickup deadline
-	 * has passed, releasing (or reassigning) the held copies.
-	 *
-	 * @return the number of reservations that were expired
-	 */
-	public int expireOverdueReservations() throws SQLException {
+ * Expires every READY_FOR_PICKUP reservation whose pickup deadline
+ * has passed, releasing or reassigning its held copy.
+ *
+ * @return the results of all expired reservations
+ */
+public ArrayList<ExpiredReservationResult> expireOverdueReservations()
+        throws SQLException {
 
-	    int expiredCount = 0;
+    ArrayList<ExpiredReservationResult> expiredResults =
+            new ArrayList<>();
 
-	    for (Reservation databaseReservation :
-	            reservationRepository.findAllReservations()) {
+    for (Reservation databaseReservation :
+            reservationRepository.findAllReservations()) {
 
-	        if (databaseReservation.getStatus()
-	                != ReservationStatus.READY_FOR_PICKUP) {
-	            continue;
-	        }
+        if (databaseReservation.getStatus()
+                != ReservationStatus.READY_FOR_PICKUP) {
+            continue;
+        }
 
-	        LocalDate deadline = databaseReservation.getExpirationDate();
+        LocalDate deadline = databaseReservation.getExpirationDate();
 
-	        if (deadline == null || !LocalDate.now().isAfter(deadline)) {
-	            continue;
-	        }
+        if (deadline == null || !LocalDate.now().isAfter(deadline)) {
+            continue;
+        }
 
-	        // Use the service's own (cached) object so memory stays in sync
-	        Reservation tracked =
-	                findReservationById(databaseReservation.getReservationId());
+        Reservation tracked =
+                findReservationById(databaseReservation.getReservationId());
 
-	        expireReservation(tracked);
-	        expiredCount++;
-	    }
+        // Expire the reservation and check whether its copy was reassigned
+        boolean copyReassigned = expireReservation(tracked);
 
-	    return expiredCount;
-	}
+        // Keep the reservation and reassignment result together
+        expiredResults.add(
+                new ExpiredReservationResult(tracked, copyReassigned)
+        );
+    }
+
+    return expiredResults;
+}
 
 	/**
 	 * Searches for a reservation using its unique ID.
@@ -145,6 +152,7 @@ public class ReservationService {
 	            return reservation;
 	        }
 	    }
+	    
 
 	    // If not found in memory, search MariaDB
 	    Reservation reservation =
@@ -430,7 +438,7 @@ public class ReservationService {
      * Expires a reservation and reassigns its copy if another
      * reservation is waiting for the same book.
      */
-    public void expireReservation(Reservation reservation)
+    public boolean expireReservation(Reservation reservation)
             throws SQLException {
 
         if (reservation == null) {
@@ -482,7 +490,7 @@ public class ReservationService {
 
         // No other waiting reservation exists
         if (nextReservationId == -1) {
-            return;
+            return false;
         }
 
         // Find the next reservation in memory
@@ -517,6 +525,9 @@ public class ReservationService {
 
             reservations.add(nextReservation);
         }
+
+        // A waiting reservation received the copy
+        return true;
     }
 }
 

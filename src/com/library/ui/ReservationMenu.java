@@ -7,8 +7,10 @@ import com.library.enums.ReservationStatus;
 import com.library.model.Book;
 import com.library.model.Member;
 import com.library.model.Reservation;
+import com.library.model.ExpiredReservationResult;
 import com.library.service.BorrowService;
 import com.library.service.ReservationService;
+
 
 public class ReservationMenu extends Menu {
 
@@ -108,11 +110,11 @@ public class ReservationMenu extends Menu {
         reservationService.cancelReservation(reservation);
         System.out.println("Reservation cancelled.");
     }
-
     private void expirePickups() throws SQLException {
-        int count = reservationService.expireOverdueReservations();
-        System.out.println(count == 0
-                ? "No reservation has passed its pickup deadline."
-                : count + " reservation(s) expired and their copies released.");
+
+        ArrayList<ExpiredReservationResult> results =
+                reservationService.expireOverdueReservations();
+
+        ReservationReport.displayExpiredReservations(results);
     }
 }

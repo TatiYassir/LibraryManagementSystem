@@ -1,6 +1,7 @@
 package com.library.ui;
 
 import java.sql.SQLException;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.List;
 
 /**
@@ -56,6 +57,10 @@ public abstract class Menu {
 
             try {
                 handle(choice);
+            } catch (SQLIntegrityConstraintViolationException e) {
+                System.out.println("Error: this record is still used by other "
+                        + "records (copies, borrowings or reservations), "
+                        + "so the operation was refused.");
             } catch (SQLException e) {
                 System.out.println("Database error: " + e.getMessage());
             } catch (IllegalArgumentException | IllegalStateException e) {

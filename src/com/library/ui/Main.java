@@ -1,10 +1,13 @@
 package com.library.ui;
 
 import java.sql.SQLException;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
-
+import java.util.ArrayList;
 import com.library.service.BorrowService;
 import com.library.service.ReservationService;
+import com.library.model.ExpiredReservationResult;
+
 
 public class Main {
 
@@ -21,11 +24,12 @@ public class Main {
 
         // Release copies held by reservations that were never collected
         try {
-            int expired = reservationService.expireOverdueReservations();
-            if (expired > 0) {
-                System.out.println(expired
-                        + " expired reservation(s) were released at startup.");
-            }
+        	ArrayList<ExpiredReservationResult> expiredResults =
+        	        reservationService.expireOverdueReservations();
+
+        	if (!expiredResults.isEmpty()) {
+        	    ReservationReport.displayExpiredReservations(expiredResults);
+        	}
         } catch (SQLException e) {
             System.out.println("Could not check expired reservations: "
                     + e.getMessage());
@@ -39,6 +43,19 @@ public class Main {
         Menu reservationMenu = new ReservationMenu(
                 in, pickers, reservationService, borrowService);
         Menu reportsMenu = new ReportsMenu(in, borrowService, reservationService);
+
+        try {
+            runMainMenu(in, bookMenu, copyMenu, memberMenu,
+                    borrowingMenu, reservationMenu, reportsMenu);
+        } catch (NoSuchElementException e) {
+            // Input stream closed (Ctrl+D / Ctrl+Z): leave quietly
+            System.out.println("\nInput closed. Goodbye!");
+        }
+    }
+
+    private static void runMainMenu(ConsoleInput in, Menu bookMenu,
+            Menu copyMenu, Menu memberMenu, Menu borrowingMenu,
+            Menu reservationMenu, Menu reportsMenu) {
 
         while (true) {
             System.out.println("\n===== LIBRARY MANAGEMENT SYSTEM =====");
