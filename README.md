@@ -376,5 +376,3 @@ This project was developed to apply and strengthen practical knowledge of:
 - Entity relationships and status management
 
 ---
-
-**Developed as an academic Java project.**
