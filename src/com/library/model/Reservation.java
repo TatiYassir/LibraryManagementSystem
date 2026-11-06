@@ -51,7 +51,16 @@ public class Reservation {
             throw new IllegalArgumentException(
                     "Required reservation information cannot be null");
         }
-
+        if (status == ReservationStatus.READY_FOR_PICKUP &&
+                (expirationDate == null || assignedCopy == null)) {
+            throw new IllegalArgumentException(
+                    "A ready reservation must have an assigned copy and expiration date");
+        }
+        if (assignedCopy != null &&
+                assignedCopy.getBook().getBookId() != book.getBookId()) {
+            throw new IllegalArgumentException(
+                    "Assigned copy does not belong to the reserved book");
+        }
         this.reservationId = reservationId;
         this.member = member;
         this.book = book;

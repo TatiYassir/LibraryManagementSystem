@@ -11,9 +11,9 @@ USE library_management;
 -- 1. Books
 CREATE TABLE IF NOT EXISTS books (
     book_id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255),
-    author VARCHAR(255),
-    publication_year INT
+    title VARCHAR(255) NOT NULL,
+	author VARCHAR(255) NOT NULL,
+	publication_year INT NOT NULL
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_general_ci;
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS members (
     member_id INT AUTO_INCREMENT PRIMARY KEY,
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(30)
+    phone_number VARCHAR(30) NOT NULL
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_general_ci;

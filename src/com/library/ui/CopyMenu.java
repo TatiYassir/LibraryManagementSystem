@@ -24,9 +24,10 @@ public class CopyMenu extends Menu {
         this.reservationService = reservationService;
     }
 
+ // In CopyMenu.java
     @Override
     protected String title() {
-        return "BOOK COPY MENU";
+        return "BOOK COPIES MENU"; // Aligned with header style
     }
 
     @Override

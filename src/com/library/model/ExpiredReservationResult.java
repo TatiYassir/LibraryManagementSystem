@@ -9,6 +9,11 @@ public class ExpiredReservationResult {
             Reservation reservation,
             boolean copyReassigned) {
 
+        if (reservation == null) {
+            throw new IllegalArgumentException(
+                    "Reservation cannot be null");
+        }
+
         this.reservation = reservation;
         this.copyReassigned = copyReassigned;
     }

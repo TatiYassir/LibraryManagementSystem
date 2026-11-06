@@ -19,7 +19,9 @@ public class BookCopy {
 	    if (status == null) {
 	        throw new IllegalArgumentException("Copy status cannot be null");
 	    }
-
+	    if (copyId <= 0) {
+	        throw new IllegalArgumentException("Invalid copy ID");
+	    }
 	    this.copyId = copyId;
 	    this.book = book;
 	    this.status = status;
@@ -38,7 +40,11 @@ public class BookCopy {
 	
 	//setter :
 	public void setStatus(CopyStatus status) {
-		this.status = status;
+	    if (status == null) {
+	        throw new IllegalArgumentException("Copy status cannot be null");
+	    }
+
+	    this.status = status;
 	}
 
 	@Override

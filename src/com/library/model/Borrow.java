@@ -15,7 +15,9 @@ public class Borrow {
 	// Constructor used to create a new borrowing
 	public Borrow(int borrowId, Member member, BookCopy bookCopy,
 	        LocalDate expectedReturnDate) {
-
+		if (borrowId <= 0) {
+		    throw new IllegalArgumentException("Invalid borrowing ID");
+		}
 	    if (member == null || bookCopy == null) {
 	        throw new IllegalArgumentException(
 	                "Member and book copy cannot be null");
@@ -40,7 +42,9 @@ public class Borrow {
 	public Borrow(int borrowId, Member member, BookCopy bookCopy,
 	        LocalDate borrowDate, LocalDate expectedReturnDate,
 	        LocalDate actualReturnDate, BorrowStatus status) {
-
+		if (borrowId <= 0) {
+		    throw new IllegalArgumentException("Invalid borrowing ID");
+		}
 	    if (member == null || bookCopy == null || borrowDate == null
 	            || expectedReturnDate == null || status == null) {
 	        throw new IllegalArgumentException("Invalid borrowing data");
@@ -59,7 +63,11 @@ public class Borrow {
 	        throw new IllegalArgumentException(
 	                "Only returned borrowings can have an actual return date");
 	    }
-
+	    if (actualReturnDate != null &&
+	            actualReturnDate.isBefore(borrowDate)) {
+	        throw new IllegalArgumentException(
+	                "Actual return date cannot be before borrow date");
+	    }
 	    this.borrowId = borrowId;
 	    this.member = member;
 	    this.bookCopy = bookCopy;
